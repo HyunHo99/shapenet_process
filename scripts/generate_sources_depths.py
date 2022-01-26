@@ -1,4 +1,5 @@
 import sys
+sys.path.append(".")
 sys.path.append("..")
 
 import numpy as np
@@ -7,6 +8,8 @@ import os
 import pyrender
 import trimesh
 import random
+
+from utils.math import *
 
 def generate_source_depths(
         scene,
@@ -22,26 +25,19 @@ def generate_source_depths(
     theta = random.uniform(1e-5, np.pi-1e-5)
     phi = random.uniform(0, 2 * np.pi)
 
-    r = 3 * scene.scale
+    # set camera intrinsics
     fx = 1062
     fy = 1062
-    K = np.array([fx, 0, width / 2,
-                  0, fy, height / 2,
-                  0, 0, 1]).reshape((3, 3))
-    z = r * np.array([
-        np.sin(theta) * np.cos(phi), np.cos(theta), np.sin(theta) * np.sin(phi)
-    ])
-    z_norm = (z / np.linalg.norm(z))
-    up_vector = np.array([0, 1, 0])
-    left_vector = np.cross(up_vector, z_norm)
-    left_vector = left_vector / np.linalg.norm(left_vector)
-    up_vector = np.cross(z_norm, left_vector)
-    R = np.eye(4)
-    R[:3, :3] = np.stack((left_vector, up_vector, z_norm), axis=-1)
-    T = np.eye(4)
-    T[:3, 3] = z
-    T = T @ R
+    K = build_camera_intrinsic(fx, fy, height, width)
+    
+    # set camera extrinsics
+    r = 3 * scene.scale
+    E = build_camera_extrinsic(
+        r, theta, phi,
+        np.array([0., 1., 0.]),
+    )
 
+    # add camera
     cam = pyrender.IntrinsicsCamera(
         fx=K[0, 0],
         fy=K[1, 1],
@@ -50,18 +46,25 @@ def generate_source_depths(
         znear=znear,
         zfar=zfar,
     )
-    cam_node = pyrender.Node(camera=cam, matrix=T)
+    cam_node = pyrender.Node(camera=cam, matrix=E)
     scene.add_node(cam_node)
 
+    # add light
     light = pyrender.DirectionalLight(color=np.ones(3), intensity=3)
     light_node = pyrender.Node(light=light, matrix=np.eye(4))
     scene.add_node(light_node, parent_node=cam_node)
+
     render = pyrender.OffscreenRenderer(width, height)
     _, depth = render.render(scene)
     render.delete()
+
+    # normalize depth
     depth = depth / r
     plt.imshow(depth)
     plt.show()
+
+    z = E[:3, 3]
+    R = E[:3, :3]
     view_direction = - z / np.linalg.norm(z)
 
     Pi = np.zeros((3, 4))
@@ -70,9 +73,4 @@ def generate_source_depths(
     Pi = R[:3, :3].T @ Pi
 
     return depth, view_direction, Pi
-
-if __name__ == "__main__":
-    path = "./data/models2/models/model_normalized.obj"
-    tmesh = trimesh.load(path)
-    scene = pyrender.Scene.from_trimesh_scene(tmesh)
-    generate_source_depths(scene, width=512, height=512)
+    
