@@ -1,9 +1,16 @@
+import sys
+
+sys.path.append(".")
+sys.path.append("..")
+
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 import pyrender
 import trimesh
 import random
+
+from utils.math import *
 
 def generate_source_colors(
         scene,
@@ -14,31 +21,22 @@ def generate_source_colors(
 ):
     # theta : rotate horizontal, (0, pi] (y축과 이루는 각)
     # phi : rotate vertical [0, 2*pi] (x축과 이루는 각)
-    
     # input = width, height, mesh_path(.obj file)
     # output = W*H*3 array
-    theta = random.uniform(1e-5, np.pi-1e-5)
-    phi = random.uniform(0, 2 * np.pi)
 
-    r = 3 * scene.scale
+    # set camera intrinsic
     fx = 1062
     fy = 1062
-    K = np.array([fx, 0, width / 2,
-                  0, fy, height / 2,
-                  0, 0, 1]).reshape((3, 3))
-    z = r * np.array([
-        np.sin(theta) * np.cos(phi), np.cos(theta), np.sin(theta) * np.sin(phi)
-    ])
-    z_norm = (z / np.linalg.norm(z))
-    up_vector = np.array([0, 1, 0])
-    left_vector = np.cross(up_vector, z_norm)
-    left_vector = left_vector / np.linalg.norm(left_vector)
-    up_vector = np.cross(z_norm, left_vector)
-    R = np.eye(4)
-    R[:3, :3] = np.stack((left_vector, up_vector, z_norm), axis=-1)
-    T = np.eye(4)
-    T[:3, 3] = z
-    T = T @ R
+    K = build_camera_intrinsic(fx, fy, height, width)
+
+    # set camera extrinsic
+    theta = random.uniform(1e-5, np.pi-1e-5)
+    phi = random.uniform(0, 2 * np.pi)
+    r = 3 * scene.scale
+    E = build_camera_extrinsic(
+        r, theta, phi,
+        np.array([0., 1., 0.])
+    )
 
     cam = pyrender.IntrinsicsCamera(
         fx=K[0, 0],
@@ -48,7 +46,7 @@ def generate_source_colors(
         znear=znear,
         zfar=zfar,
     )
-    cam_node = pyrender.Node(camera=cam, matrix=T)
+    cam_node = pyrender.Node(camera=cam, matrix=E)
     scene.add_node(cam_node)
 
     light = pyrender.DirectionalLight(color=np.ones(3), intensity=3)
@@ -58,11 +56,7 @@ def generate_source_colors(
     color, _ = render.render(scene)
     render.delete()
     scene.remove_node(cam_node)
+
+    z = E[:3, 3]
     view_direction = - z / np.linalg.norm(z)
     return color, view_direction
-
-
-# path = "./models2/models/model_normalized.obj"
-# tmesh = trimesh.load(path)
-# scene = pyrender.Scene.from_trimesh_scene(tmesh)
-# generate_source_colors(scene, width=512, height=512)

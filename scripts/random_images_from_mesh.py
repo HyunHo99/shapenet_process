@@ -1,3 +1,6 @@
+import sys
+sys.path.append("..")
+
 import os
 os.environ['PYOPENGL_PLATFORM'] = 'egl'
 os.environ['EGL_DEVICE_ID'] = "3"
@@ -41,5 +44,5 @@ def random_images_from_mesh(root_dir, out_dir, height, width, colors=True, image
             
         
         
-    
-random_images_from_mesh("./ShapeNetCore.v2", "./shape_car_images/", 512,512)
+if __name__ == "__main__":
+    random_images_from_mesh("./ShapeNetCore.v2", "./shape_car_images/", 512,512)
