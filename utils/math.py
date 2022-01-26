@@ -83,18 +83,22 @@ def build_camera_extrinsic(
     """
     # spherical -> cartesian
     t = _spherical_to_cartesian(radius, theta, phi)
+    t_unit = t / np.linalg.norm(t)
 
     # compute camera orientation
-    left_v = np.cross(t / np.linalg.norm(t), up_v)
+    left_v = np.cross(t_unit, up_v)
     left_v = left_v / np.linalg.norm(left_v)
-    up_v = np.cross(left_v, t / np.linalg.norm(t))
+    up_v = np.cross(left_v, t_unit)
+    up_v = up_v / np.linalg.norm(up_v)
 
     up_v = np.reshape(up_v, (3, 1))
     left_v = np.reshape(left_v, (3, 1))
     t = np.reshape(t, (3, 1))
+    t_unit = np.reshape(t_unit, (3, 1))
+    R = np.concatenate([-left_v, up_v, t_unit], axis=-1)
 
     # construct 4 x 4 extrinsic matrix
-    E = np.concatenate([left_v, up_v, t, t], axis=-1)
+    E = np.concatenate([R, t], axis=-1)
     fourth_row = np.array([0., 0., 0., 1.])
     fourth_row = np.reshape(fourth_row, (1, 4))
 
