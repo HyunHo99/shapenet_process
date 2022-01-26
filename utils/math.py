@@ -20,8 +20,10 @@ def build_camera_intrinsic(
     - fy: Float.
         Scaling factor along y-axis of the camera frame.
     - height: Int.
+        Height of the viewport.
     - width: Int.
-
+        Width of the viewport.
+        
     Returns:
     - K: Numpy array of shape (3, 3).
         Camera intrinsic matrix.
