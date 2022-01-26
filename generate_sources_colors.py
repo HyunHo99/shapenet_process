@@ -1,4 +1,3 @@
-import open3d as o3d
 import numpy as np
 import matplotlib.pyplot as plt
 import os
@@ -7,26 +6,23 @@ import trimesh
 import random
 
 def generate_source_colors(
-        mesh_path,
+        scene,
         height,
         width,
-        images_per_mesh=10,
         znear=0.05,
         zfar=1500,
 ):
     # theta : rotate horizontal, (0, pi] (y축과 이루는 각)
     # phi : rotate vertical [0, 2*pi] (x축과 이루는 각)
-    # input = phi, theta of target camera, width, height, mesh_path,
+    
+    # input = width, height, mesh_path(.obj file)
     # output = W*H*3 array
     theta = random.uniform(1e-5, np.pi-1e-5)
     phi = random.uniform(0, 2 * np.pi)
 
-    tmesh = trimesh.load(mesh_path)
-    scene = pyrender.Scene.from_trimesh_scene(tmesh)
-
     r = 3 * scene.scale
-    fx = 39.227512 / 0.0369161  # focal length
-    fy = 39.227512 / 0.0369161
+    fx = 1062
+    fy = 1062
     K = np.array([fx, 0, width / 2,
                   0, fy, height / 2,
                   0, 0, 1]).reshape((3, 3))
@@ -59,12 +55,14 @@ def generate_source_colors(
     light_node = pyrender.Node(light=light, matrix=np.eye(4))
     scene.add_node(light_node, parent_node=cam_node)
     render = pyrender.OffscreenRenderer(width, height)
-    color, depth = render.render(scene)
-    # plt.imshow(depth)
-    # plt.show()
-    plt.imshow(color)
-    plt.show()
+    color, _ = render.render(scene)
+    render.delete()
+    scene.remove_node(cam_node)
+    view_direction = - z / np.linalg.norm(z)
+    return color, view_direction
 
 
-path = "./models2/models/model_normalized.obj"
-generate_source_colors(path, images_per_mesh=10, width=500, height=500)
+# path = "./models2/models/model_normalized.obj"
+# tmesh = trimesh.load(path)
+# scene = pyrender.Scene.from_trimesh_scene(tmesh)
+# generate_source_colors(scene, width=512, height=512)
