@@ -71,8 +71,8 @@ def generate_source_depths(
 
     return depth, view_direction, Pi
 
-
-# path = "./models2/models/model_normalized.obj"
-# tmesh = trimesh.load(path)
-# scene = pyrender.Scene.from_trimesh_scene(tmesh)
-# generate_source_depths(scene, width=512, height=512)
+if __name__ == "__main__":
+    path = "./models2/models/model_normalized.obj"
+    tmesh = trimesh.load(path)
+    scene = pyrender.Scene.from_trimesh_scene(tmesh)
+    generate_source_depths(scene, width=512, height=512)
