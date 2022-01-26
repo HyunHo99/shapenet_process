@@ -5,17 +5,16 @@ import pyrender
 import trimesh
 import random
 
-def generate_source_colors(
+def generate_source_depths(
         scene,
         height,
         width,
         znear=0.05,
         zfar=1500,
 ):
-    # theta : rotate horizontal, (0, pi] (y축과 이루는 각)
+    # theta : rotate horizontal, (0, pi) (y축과 이루는 각)
     # phi : rotate vertical [0, 2*pi] (x축과 이루는 각)
-    
-    # input = width, height, mesh_path(.obj file)
+    # input = phi, theta of target camera, width, height, pyrender scene of mesh
     # output = W*H*3 array
     theta = random.uniform(1e-5, np.pi-1e-5)
     phi = random.uniform(0, 2 * np.pi)
@@ -55,14 +54,22 @@ def generate_source_colors(
     light_node = pyrender.Node(light=light, matrix=np.eye(4))
     scene.add_node(light_node, parent_node=cam_node)
     render = pyrender.OffscreenRenderer(width, height)
-    color, _ = render.render(scene)
+    _, depth = render.render(scene)
     render.delete()
-    scene.remove_node(cam_node)
+    depth = depth / r
+    plt.imshow(depth)
+    plt.show()
     view_direction = - z / np.linalg.norm(z)
-    return color, view_direction
+
+    Pi = np.zeros((3, 4))
+    Pi[:, :3] = np.linalg.inv(K)
+    Pi[:, 3] = -z
+    Pi = R[:3, :3].T @ Pi
+
+    return depth, view_direction, Pi
 
 
 # path = "./models2/models/model_normalized.obj"
 # tmesh = trimesh.load(path)
 # scene = pyrender.Scene.from_trimesh_scene(tmesh)
-# generate_source_colors(scene, width=512, height=512)
+# generate_source_depths(scene, width=512, height=512)
