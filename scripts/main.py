@@ -1,4 +1,5 @@
 import sys
+sys.path.append(".")
 sys.path.append("..")
 
 import open3d as o3d
@@ -110,7 +111,7 @@ def render_mesh_o3d(
 
 
 if __name__ == "__main__":
-    path = "./models2/models/model_normalized.obj"
+    path = "./data/models2/models/model_normalized.obj"
     out_file = "./depth.png"
     render_mesh_o3d(
         path, 

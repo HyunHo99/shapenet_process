@@ -65,7 +65,7 @@ def generate_source_colors(
     return color, view_direction
 
 if __name__ == "__main__":
-    path = "./models2/models/model_normalized.obj"
+    path = "./data/models2/models/model_normalized.obj"
     tmesh = trimesh.load(path)
     scene = pyrender.Scene.from_trimesh_scene(tmesh)
     generate_source_colors(scene, width=512, height=512)
