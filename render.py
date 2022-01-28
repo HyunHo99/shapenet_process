@@ -52,7 +52,7 @@ def render_mesh_o3d(
     
     # set camera extrinsics
     E = build_camera_extrinsic(
-        1.0, theta, phi,
+        1.2, theta, phi,
         np.array([0., 1., 0.])
     )
 

@@ -49,7 +49,7 @@ def _render_shapenet_sample(
 
     # specify camera intrinsics and extrinsics
     phis = np.linspace(0, 2 * np.pi, 24)  # divide 360 degrees into 24 steps
-    thetas = (np.pi / 2.25) * np.ones_like(phis)  # fixed elevation
+    thetas = (np.pi / 2.05) * np.ones_like(phis)  # fixed elevation
 
     # load mesh
     mesh = o3d.io.read_triangle_mesh(mesh_file)
@@ -57,7 +57,7 @@ def _render_shapenet_sample(
     mesh.paint_uniform_color((0.7, 0.7, 0.7))
     box = mesh.get_axis_aligned_bounding_box()
     mesh_scale = ((box.get_max_bound() - box.get_min_bound()) ** 2).sum()
-    mesh = mesh.scale(0.2 * mesh_scale, center=(0, 0, 0))
+    mesh = mesh.scale(0.35 * mesh_scale, center=(0, 0, 0))
 
     # render and save the results
     for view_idx, (theta, phi) in enumerate(zip(thetas, phis)):
