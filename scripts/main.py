@@ -30,6 +30,12 @@ def _render_shapenet_sample(
     if not os.path.isdir(sample_dir):
         return
 
+    # specify the file name of the mesh
+    # if mesh file is missing, ignore and quit
+    mesh_file = os.path.join(sample_dir, "models/model_normalized.obj")
+    if not os.path.exists(mesh_file):
+        return
+
     # create directories for outputs
     sample_save_dir = os.path.join(save_dir, str(sample_id))
     sample_img_dir = os.path.join(sample_save_dir, "image")
@@ -44,10 +50,6 @@ def _render_shapenet_sample(
         os.mkdir(sample_depth_dir)
     if not os.path.exists(sample_mask_dir):
         os.mkdir(sample_mask_dir)
-
-    # specify the file name of the mesh
-    mesh_file = os.path.join(sample_dir, "models/model_normalized.obj")
-    assert os.path.exists(mesh_file), "[!] Mesh file does not exist at {}".format(mesh_file)
 
     # specify camera intrinsics and extrinsics
     phis = np.linspace(0, 2 * np.pi, 24)  # divide 360 degrees into 24 steps
