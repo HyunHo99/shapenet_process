@@ -1,6 +1,8 @@
 import os
 import sys
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+os.environ['PYOPENGL_PLATFORM'] = 'egl'
+os.environ['EGL_DEVICE_ID'] = "1"
 sys.path.append(".")
 sys.path.append("..")
 
