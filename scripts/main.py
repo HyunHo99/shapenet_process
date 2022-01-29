@@ -1,8 +1,8 @@
 import os
 import sys
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
-#os.environ['PYOPENGL_PLATFORM'] = 'egl'
-#os.environ['EGL_DEVICE_ID'] = "1"
+os.environ['PYOPENGL_PLATFORM'] = 'egl'
+os.environ['EGL_DEVICE_ID'] = "1"
 sys.path.append(".")
 sys.path.append("..")
 
@@ -126,11 +126,20 @@ def render_shapenet_samples(
     print("[!] Done.")
 
 if __name__ == "__main__":
+    if sys.platform == "darwin":
+        print(
+            "[!] Pyrender yields incorrect projection matrix on macOS. \
+            We highly recommend you to run this script on other OS such as Linux, Windows, etc. \
+            For details of problematic behavior of Pyrender, please refer to \
+            https://pyrender.readthedocs.io/en/latest/_modules/pyrender/camera.html#IntrinsicsCamera.get_projection_matrix."
+        )
+        quit(-1)
+
     # parse arguments
     parser = argparse.ArgumentParser()
     #parser.add_argument("--shapenet_path", type=str, default="/home/dreamy1534/encoder4editing/data/paintme/02958343")
     #parser.add_argument("--save_path", type=str, default="/home/dreamy1534/encoder4editing/data/paintme/shapenet_mv/")
-    parser.add_argument("--shapenet_path", type=str, default="./data")
+    parser.add_argument("--shapenet_path", type=str, default="./data/shapenet_example")
     parser.add_argument("--save_path", type=str, default="./result")
     parser.add_argument("--height", type=int, default=192)
     parser.add_argument("--width", type=int, default=256)
