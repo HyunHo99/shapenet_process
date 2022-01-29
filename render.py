@@ -44,6 +44,8 @@ def render_mesh_o3d(
     - color: A Numpy array of shape (3, height, width).
     - depth: A Numpy array of shape (1, height, width).
     - mask: A Numpy array of shape (1, height, width).
+    - K: A Numpy array of shape (3, 4).
+    - E: A Numpy array of shape (3, 4).
     """
     # set camera intrinsics
     fx = 39.227512 / 0.0369161
@@ -105,4 +107,4 @@ def render_mesh_o3d(
     mask = ~np.isinf(depth)
     mask = (mask.astype(np.uint8) * 255).astype(np.uint8)
 
-    return img, depth, mask
+    return img, depth, mask, K[:3, :], E[:3, :]

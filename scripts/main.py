@@ -8,12 +8,14 @@ sys.path.append("..")
 
 import argparse
 import time
+
 import multiprocessing as mp
 from joblib import Parallel, delayed
 from itertools import repeat
 
 import cv2
 import numpy as np
+from tqdm import tqdm
 
 from render import *
 from utils.math import *
@@ -63,9 +65,11 @@ def _render_shapenet_sample(
     mesh_scale = ((box.get_max_bound() - box.get_min_bound()) ** 2).sum()
     mesh = mesh.scale(0.35 * mesh_scale, center=(0, 0, 0))
 
+    camera_params = {}
+
     # render and save the results
     for view_idx, (theta, phi) in enumerate(zip(thetas, phis)):
-        img, depth, mask = render_mesh_o3d(
+        img, depth, mask, K, E = render_mesh_o3d(
             mesh,
             theta,
             phi,
@@ -75,6 +79,10 @@ def _render_shapenet_sample(
         cv2.imwrite(os.path.join(sample_img_dir, "{}.jpg".format(view_idx)), img)
         cv2.imwrite(os.path.join(sample_depth_dir, "{}.exr".format(view_idx)), depth)
         cv2.imwrite(os.path.join(sample_mask_dir, "{}.jpg".format(view_idx)), mask)
+
+        camera_params["world_mat_{}".format(view_idx)] = E
+        camera_params["camera_mat_{}".format(view_idx)] = K
+    np.savez(os.path.join(sample_mask_dir, "cameras.npz"))
 
 def render_shapenet_samples(
     shapenet_src_dir: str,
@@ -90,7 +98,8 @@ def render_shapenet_samples(
         os.mkdir(save_dir)
     
     start_t = time.time()
-    
+
+    """
     num_cores = mp.cpu_count() // 2
     print("[!] Using {} cores".format(num_cores))
     _ = Parallel(n_jobs=num_cores)(
@@ -98,21 +107,39 @@ def render_shapenet_samples(
             for src_dir, sample_id, out_dir, H, W in \
             zip(repeat(shapenet_src_dir), sample_ids, repeat(save_dir), repeat(height), repeat(width))
     )
+    """
+
+    for sample_id in tqdm(sample_ids):
+        _render_shapenet_sample(
+            shapenet_src_dir,
+            sample_id,
+            save_dir,
+            height, width
+        )
 
     print("[!] Took {} seconds".format(time.time() - start_t))
     print("[!] Done.")
 
 if __name__ == "__main__":
+    # set verbosability level to the lowest
+    #o3d.utility.set_verbosity_level(0)
+
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--shapenet_path", type=str, default="./data")
-    parser.add_argument("--save_path", type=str, default="./result")
+    parser.add_argument("--shapenet_path", type=str, default="/home/dreamy1534/encoder4editing/data/paintme/02958343")
+    parser.add_argument("--save_path", type=str, default="/home/dreamy1534/encoder4editing/data/paintme/shapenet_mv/")
     parser.add_argument("--height", type=int, default=192)
     parser.add_argument("--width", type=int, default=256)
     args = parser.parse_args()
 
     # render
     render_shapenet_samples(
-        args.shapenet_path, "result", 
+        args.shapenet_path, args.save_path, 
         args.height, args.width
         )
+    #_render_shapenet_sample(
+    #    args.shapenet_path,
+    #    "1a0bc9ab92c915167ae33d942430658c",
+    #    args.save_path,
+    #    args.height, args.width,
+    #    )
