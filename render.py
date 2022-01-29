@@ -91,6 +91,7 @@ def render_mesh_o3d(
         znear=znear,
         zfar=zfar,
     )
+    K = cam.get_projection_matrix(width, height)
 
     cam_node = pyrender.Node(camera=cam, matrix=E)
     scene.add_node(cam_node)
