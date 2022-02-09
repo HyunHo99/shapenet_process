@@ -1,123 +1,154 @@
+import os
 import sys
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
+
+# NOTE: when rendering on headless server, register the following env variables
+#os.environ['PYOPENGL_PLATFORM'] = 'egl'
+#os.environ['EGL_DEVICE_ID'] = "1"
 sys.path.append(".")
 sys.path.append("..")
 
-import open3d as o3d
-import numpy as np
-import matplotlib.pyplot as plt
-import pyrender
+import argparse
+import csv
+import time
 
+import multiprocessing as mp
+from joblib import Parallel, delayed
+from itertools import repeat
+
+import cv2
+import numpy as np
+from tqdm import tqdm
+
+from render import *
 from utils.math import *
 
-def render_mesh_o3d(
-        mesh_path: str,
-        save_path: str,
-        theta: float,
-        phi: float,
-        height: int,
-        width: int,
-        znear: float = 0.01,
-        zfar: float = 1500,
+def _render_shapenet_sample(
+    shapenet_src_dir: str, sample_id: str, 
+    save_dir: str,
+    height: int, width: int,
     ) -> None:
-    """
-    Renders a mesh loaded as open3d.geometry.TriangleMesh object.
+    sample_dir = os.path.join(shapenet_src_dir, str(sample_id))
+    assert os.path.exists(sample_dir), "[!] Path {} does not exist".format(sample_dir)
 
-    Args:
-    - mesh_path: String.
-        Path to where the mesh is stored.
-    - save_path: String.
-        Path to where the rendered image will be saved.
-    - theta: Float.
-        Angle between positive direction of y axis and displacement vector.
-    - phi: Float.
-        Angle between positive direction of x axis and displacement vector.
-    - height: Int.
-        Height of the viewport.
-    - width: Int.
-        Width of the viewport.
-    - znear: Float.
-        The nearest visible depth.
-    - zfar: Float.
-        The farthest visible depth.
-    """
-    # set camera intrinsics
-    fx = 39.227512 / 0.0369161
-    fy = 39.227512 / 0.0369161
-    K = build_camera_intrinsic(fx, fy, height, width)
-    
-    # set camera extrinsics
-    E = build_camera_extrinsic(
-        1.0, theta, phi,
-        np.array([0., 1., 0.])
-    )
+    # if not a directory, ignore and quit
+    if not os.path.isdir(sample_dir):
+        return
 
-    # load mesh and process
-    mesh = o3d.io.read_triangle_mesh(str(mesh_path))
+    # specify the file name of the mesh
+    # if mesh file is missing, ignore and quit
+    mesh_file = os.path.join(sample_dir, "models/model_normalized.obj")
+    if not os.path.exists(mesh_file):
+        return
+
+    # create directories for outputs
+    sample_save_dir = os.path.join(save_dir, str(sample_id))
+    sample_img_dir = os.path.join(sample_save_dir, "image")
+    sample_depth_dir = os.path.join(sample_save_dir, "depth")
+    sample_mask_dir = os.path.join(sample_save_dir, "mask")
+
+    if not os.path.exists(sample_save_dir):
+        os.mkdir(sample_save_dir)
+    if not os.path.exists(sample_img_dir):
+        os.mkdir(sample_img_dir)
+    if not os.path.exists(sample_depth_dir):
+        os.mkdir(sample_depth_dir)
+    if not os.path.exists(sample_mask_dir):
+        os.mkdir(sample_mask_dir)
+
+    # specify camera intrinsics and extrinsics
+    phis = np.linspace(0, 2 * np.pi, 24)  # divide 360 degrees into 24 steps
+    thetas = (np.pi / 2.05) * np.ones_like(phis)  # fixed elevation
+
+    # load mesh
+    mesh = o3d.io.read_triangle_mesh(mesh_file)
     mesh.compute_vertex_normals()
     mesh.paint_uniform_color((0.7, 0.7, 0.7))
     box = mesh.get_axis_aligned_bounding_box()
     mesh_scale = ((box.get_max_bound() - box.get_min_bound()) ** 2).sum()
+    mesh = mesh.scale(0.35 * mesh_scale, center=(0, 0, 0))
 
-    mesh = mesh.scale(0.3 * mesh_scale, center=(0, 0, 0))
-    verts = np.asarray(mesh.vertices).astype(np.float32)
-    faces = np.asarray(mesh.triangles).astype(np.int32)
-    colors = np.asarray(mesh.vertex_colors).astype(np.float32)
-    normals = np.asarray(mesh.vertex_normals).astype(np.float32)
+    camera_params = {}
 
-    scene = pyrender.Scene()
+    # render and save the results
+    for view_idx, (theta, phi) in enumerate(zip(thetas, phis)):
+        img, depth, mask, K, E = render_mesh_o3d(
+            mesh,
+            theta,
+            phi,
+            height, width,
+        )
+    
+        cv2.imwrite(os.path.join(sample_img_dir, "{}.jpg".format(view_idx)), img)
+        cv2.imwrite(os.path.join(sample_depth_dir, "{}.exr".format(view_idx)), depth)
+        cv2.imwrite(os.path.join(sample_mask_dir, "{}.jpg".format(view_idx)), mask)
 
-    # add mesh
-    mesh = pyrender.Mesh(
-        primitives=[
-            pyrender.Primitive(
-                positions=verts,
-                normals=normals,
-                color_0=colors,
-                indices=faces,
-                mode=pyrender.GLTF.TRIANGLES,
-            )
-        ],
-        is_visible=True,
-    )
-    mesh_node = pyrender.Node(mesh=mesh, matrix=np.eye(4))
-    scene.add_node(mesh_node)
+        camera_params["world_mat_{}".format(view_idx)] = E
+        camera_params["camera_mat_{}".format(view_idx)] = K
+    np.savez(os.path.join(sample_mask_dir, "cameras.npz"), **camera_params)
 
-    # add camera
-    cam = pyrender.IntrinsicsCamera(
-        fx=K[0, 0],
-        fy=K[1, 1],
-        cx=K[0, 2],
-        cy=K[1, 2],
-        znear=znear,
-        zfar=zfar,
-    )
+def render_shapenet_samples(
+    shapenet_src_dir: str,
+    save_dir: str,
+    height: int, width: int,
+    sample_csv: str = None,
+    ) -> None:
 
-    cam_node = pyrender.Node(camera=cam, matrix=E)
-    scene.add_node(cam_node)
+    # get sample directories
+    if sample_csv is None:
+        sample_ids = [d for d in os.listdir(shapenet_src_dir)]
+    else:
+        with open(sample_csv, "r", encoding="utf-8") as f:
+            content = csv.reader(f)
 
-    # add light
-    light = pyrender.DirectionalLight(color=np.ones(3), intensity=3)
-    light_node = pyrender.Node(light=light, matrix=np.eye(4))
-    scene.add_node(light_node, parent_node=cam_node)
+            sample_ids = []
 
-    render = pyrender.OffscreenRenderer(width, height)
-    color, depth = render.render(scene)
+            for idx, line in enumerate(content):
+                if idx != 0:
+                    fullID = line[0]
+                    sample_id = fullID.split(".")[-1]
+                    sample_ids.append(sample_id)
 
-    plt.imshow(depth)
-    plt.show()
+    # create the save directory
+    if not os.path.exists(save_dir):
+        os.mkdir(save_dir)
+    
+    start_t = time.time()
 
-    plt.imshow(color)
-    plt.show()
+    for sample_id in tqdm(sample_ids):
+        _render_shapenet_sample(
+            shapenet_src_dir,
+            sample_id,
+            save_dir,
+            height, width
+        )
 
+    print("[!] Took {} seconds".format(time.time() - start_t))
+    print("[!] Done.")
 
 if __name__ == "__main__":
-    path = "./data/models2/models/model_normalized.obj"
-    out_file = "./depth.png"
-    render_mesh_o3d(
-        path, 
-        out_file, 
-        theta=np.pi/3, 
-        phi=-np.pi/2, 
-        width=500, height=500
-    )
+    if sys.platform == "darwin":
+        print(
+            "[!] Pyrender yields slightly different projection matrix on macOS. \
+            We highly recommend you to run this script on other OS such as Linux, Windows, etc. \
+            For details of problematic behavior of Pyrender, please refer to \
+            https://pyrender.readthedocs.io/en/latest/_modules/pyrender/camera.html#IntrinsicsCamera.get_projection_matrix."
+        )
+        quit(-1)
 
+    # parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--shapenet_path", type=str, required=True)
+    parser.add_argument("--sample_csv", type=str, default=None, help="CSV holding IDs samples to be rendered")
+    parser.add_argument("--save_path", type=str, required=True)
+    parser.add_argument("--height", type=int, default=192)
+    parser.add_argument("--width", type=int, default=256)
+    args = parser.parse_args()
+
+    # render
+    render_shapenet_samples(
+        args.shapenet_path, 
+        args.save_path, 
+        args.height, args.width,
+        args.sample_csv,
+    )
