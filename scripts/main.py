@@ -9,6 +9,7 @@ sys.path.append(".")
 sys.path.append("..")
 
 import argparse
+import csv
 import time
 
 import multiprocessing as mp
@@ -90,26 +91,29 @@ def render_shapenet_samples(
     shapenet_src_dir: str,
     save_dir: str,
     height: int, width: int,
+    sample_csv: str = None,
     ) -> None:
 
     # get sample directories
-    sample_ids = [d for d in os.listdir(shapenet_src_dir)]
+    if sample_csv is None:
+        sample_ids = [d for d in os.listdir(shapenet_src_dir)]
+    else:
+        with open(sample_csv, "r", encoding="utf-8") as f:
+            content = csv.reader(f)
+
+            sample_ids = []
+
+            for idx, line in enumerate(content):
+                if idx != 0:
+                    fullID = line[0]
+                    sample_id = fullID.split(".")[-1]
+                    sample_ids.append(sample_id)
 
     # create the save directory
     if not os.path.exists(save_dir):
         os.mkdir(save_dir)
     
     start_t = time.time()
-
-    """
-    num_cores = mp.cpu_count() // 2
-    print("[!] Using {} cores".format(num_cores))
-    _ = Parallel(n_jobs=num_cores)(
-        delayed(_render_shapenet_sample)(src_dir, sample_id, out_dir, H, W) \
-            for src_dir, sample_id, out_dir, H, W in \
-            zip(repeat(shapenet_src_dir), sample_ids, repeat(save_dir), repeat(height), repeat(width))
-    )
-    """
 
     for sample_id in tqdm(sample_ids):
         _render_shapenet_sample(
@@ -125,7 +129,7 @@ def render_shapenet_samples(
 if __name__ == "__main__":
     if sys.platform == "darwin":
         print(
-            "[!] Pyrender yields incorrect projection matrix on macOS. \
+            "[!] Pyrender yields slightly different projection matrix on macOS. \
             We highly recommend you to run this script on other OS such as Linux, Windows, etc. \
             For details of problematic behavior of Pyrender, please refer to \
             https://pyrender.readthedocs.io/en/latest/_modules/pyrender/camera.html#IntrinsicsCamera.get_projection_matrix."
@@ -134,14 +138,17 @@ if __name__ == "__main__":
 
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--shapenet_path", type=str, default="./data/shapenet_example")
-    parser.add_argument("--save_path", type=str, default="./result")
+    parser.add_argument("--shapenet_path", type=str, required=True)
+    parser.add_argument("--sample_csv", type=str, default=None, help="CSV holding IDs samples to be rendered")
+    parser.add_argument("--save_path", type=str, required=True)
     parser.add_argument("--height", type=int, default=192)
     parser.add_argument("--width", type=int, default=256)
     args = parser.parse_args()
 
     # render
     render_shapenet_samples(
-        args.shapenet_path, args.save_path, 
-        args.height, args.width
-        )
+        args.shapenet_path, 
+        args.save_path, 
+        args.height, args.width,
+        args.sample_csv,
+    )
