@@ -1,8 +1,10 @@
 import os
 import sys
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
-os.environ['PYOPENGL_PLATFORM'] = 'egl'
-os.environ['EGL_DEVICE_ID'] = "1"
+
+# NOTE: when rendering on headless server, register the following env variables
+#os.environ['PYOPENGL_PLATFORM'] = 'egl'
+#os.environ['EGL_DEVICE_ID'] = "1"
 sys.path.append(".")
 sys.path.append("..")
 
@@ -64,11 +66,6 @@ def _render_shapenet_sample(
     box = mesh.get_axis_aligned_bounding_box()
     mesh_scale = ((box.get_max_bound() - box.get_min_bound()) ** 2).sum()
     mesh = mesh.scale(0.35 * mesh_scale, center=(0, 0, 0))
-
-    #mesh_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(
-    #    size=0.1, origin=[0, 0, 0]
-    #)
-    #o3d.visualization.draw_geometries([mesh, mesh_frame])
 
     camera_params = {}
 
@@ -137,8 +134,6 @@ if __name__ == "__main__":
 
     # parse arguments
     parser = argparse.ArgumentParser()
-    #parser.add_argument("--shapenet_path", type=str, default="/home/dreamy1534/encoder4editing/data/paintme/02958343")
-    #parser.add_argument("--save_path", type=str, default="/home/dreamy1534/encoder4editing/data/paintme/shapenet_mv/")
     parser.add_argument("--shapenet_path", type=str, default="./data/shapenet_example")
     parser.add_argument("--save_path", type=str, default="./result")
     parser.add_argument("--height", type=int, default=192)
@@ -150,9 +145,3 @@ if __name__ == "__main__":
         args.shapenet_path, args.save_path, 
         args.height, args.width
         )
-    #_render_shapenet_sample(
-    #    args.shapenet_path,
-    #    "1a0bc9ab92c915167ae33d942430658c",
-    #    args.save_path,
-    #    args.height, args.width,
-    #    )
